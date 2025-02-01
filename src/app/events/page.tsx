@@ -1,27 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import DateSelector from "../../components/DateSelector";
+import DateSelector from "@/components/DateSelector";
 import { Event, createEvent } from "../../lib/events";
+import TimeSelector from "@/components/TimeSelector";
 
 export default function Page() {
   type ValuePiece = Date | null;
   type Value = ValuePiece | [ValuePiece, ValuePiece];
 
   const [value, onChange] = useState<Value>([new Date(), new Date()]);
-  const [event, setEvent] = useState<Event>();
   const [hash, setHash] = useState<string>();
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    setEvent({
-      name: value,
-      dates: {
-        start: new Date(),
-        end: new Date(),
-      },
-    });
-  };
 
   const handleDateRangeChange = (range: [Date, Date]) => {
     onChange(range);
@@ -30,7 +19,10 @@ export default function Page() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!event?.name) {
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const eventName = formData.get("eventName") as string;
+
+    if (!eventName) {
       return false;
     }
 
@@ -42,15 +34,13 @@ export default function Page() {
       return false;
     }
 
-    const newEvent = {
-      name: event.name,
+    const newEvent: Event = {
+      name: eventName,
       dates: {
         start: value[0],
         end: value[1],
       },
     };
-
-    setEvent(newEvent);
 
     const hash = await createEvent(newEvent);
     if (hash) {
@@ -70,14 +60,15 @@ export default function Page() {
         <label htmlFor="eventName">Event Name</label>
         <input
           id="eventName"
+          name="eventName"
           type="text"
           placeholder="Party!"
-          value={event?.name}
-          onChange={handleChange}
           required
+          className="dark:bg-gray-700 dark:border-gray-600 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400 dark:text-gray-400"
         />
 
         <DateSelector onDateRangeChange={handleDateRangeChange} />
+        <TimeSelector onTimeRangeChange={null} />
         <button
           type="submit"
           className="px-4 py-2 bg-blue-500 text-white rounded-lg dark:bg-blue-700 dark:text-gray-200"
