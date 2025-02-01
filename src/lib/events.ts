@@ -24,16 +24,31 @@ export type EventResponse = {
   };
 };
 
+/**
+ * Check if a date range is valid.
+ * @param range The date range to check.
+ * @deprecated Not used in the current implementation.
+ */
 function isValidDateRange(range: DateRange): boolean {
   return range.start < range.end;
 }
 
+/**
+ * Format a date range according to Postgres date range syntax.
+ * @param range The date range to format.
+ * @returns
+ */
 function formatDateRange(range: DateRange): string {
   return `[${range.start.toISOString().split("T")[0]},${
     range.end.toISOString().split("T")[0]
   }]`;
 }
 
+/**
+ * Save an event to the database.
+ * @param e The event object to create.
+ * @returns The unique hash of the event as a nanoid.
+ */
 export async function createEvent(e: Event) {
   const client = await connect();
   try {
@@ -55,7 +70,11 @@ export async function createEvent(e: Event) {
   }
 }
 
-export async function getEvent(hash: string) {
+/**
+ * Get an event by its hash.
+ * @param hash The unique hash of the event. A nanoid (https://www.npmjs.com/package/nanoid).
+ */
+export async function getEvent(hash: string): Promise<EventResponse | false> {
   const client = await connect();
   try {
     const res = await client.query(`SELECT * FROM events WHERE hash = $1`, [
