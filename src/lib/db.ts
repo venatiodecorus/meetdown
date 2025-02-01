@@ -10,6 +10,10 @@ const client = new Client({
 
 let isConnected = false;
 
+/**
+ * Manages Postgres client connection.
+ * @returns The connected client.
+ */
 export async function connect() {
   if (!isConnected) {
     try {

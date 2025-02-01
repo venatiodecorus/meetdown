@@ -29,9 +29,9 @@ export type EventResponse = {
  * @param range The date range to check.
  * @deprecated Not used in the current implementation.
  */
-function isValidDateRange(range: DateRange): boolean {
-  return range.start < range.end;
-}
+// function isValidDateRange(range: DateRange): boolean {
+//   return range.start < range.end;
+// }
 
 /**
  * Format a date range according to Postgres date range syntax.
