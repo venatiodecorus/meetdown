@@ -6,14 +6,24 @@ import { Event, createEvent } from "../../lib/events";
 import TimeSelector from "@/components/TimeSelector";
 
 export default function Page() {
-  type ValuePiece = Date | null;
-  type Value = ValuePiece | [ValuePiece, ValuePiece];
+  type ValuePiece = Date;
+  type Value = [ValuePiece, ValuePiece];
 
   const [value, onChange] = useState<Value>([new Date(), new Date()]);
   const [hash, setHash] = useState<string>();
 
   const handleDateRangeChange = (range: [Date, Date]) => {
     onChange(range);
+  };
+
+  const handleTimeRangeChange = (range: [Date, Date]) => {
+    // Keep the existing date and only update the time
+    const newRange: Value = [new Date(value[0]), new Date(value[1])];
+    newRange[0].setHours(range[0].getHours());
+    newRange[0].setMinutes(range[0].getMinutes());
+    newRange[1].setHours(range[1].getHours());
+    newRange[1].setMinutes(range[1].getMinutes());
+    onChange(newRange);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -68,7 +78,7 @@ export default function Page() {
         />
 
         <DateSelector onDateRangeChange={handleDateRangeChange} />
-        <TimeSelector onTimeRangeChange={null} />
+        <TimeSelector onTimeRangeChange={handleTimeRangeChange} />
         <button
           type="submit"
           className="px-4 py-2 bg-blue-500 text-white rounded-lg dark:bg-blue-700 dark:text-gray-200"
