@@ -4,6 +4,11 @@ interface DateSelectorProps {
   onDateRangeChange: (range: [Date, Date]) => void;
 }
 
+/**
+ * Renders UI and allows for selection of a date range.
+ * @param onDateRangeChange Callback function to handle date range changes.
+ * @returns
+ */
 export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
   const [month, setMonth] = useState<number>(new Date().getMonth());
   const [year, setYear] = useState<number>(new Date().getFullYear());
