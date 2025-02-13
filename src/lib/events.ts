@@ -2,33 +2,47 @@
 
 import { connect } from "./db";
 import { nanoid } from "nanoid";
+import { Temporal } from "temporal-polyfill";
 
+/**
+ * Using strings to avoid issues with Temporal.PlainDate serialization.
+ */
 type DateRange = {
-  start: Date;
-  end: Date;
+  start: string;
+  end: string;
 };
 
-export type Event = {
+/**
+ * Event object to be used when creating new events.
+ */
+export type EventRequest = {
   dates: DateRange;
+  startTime: string;
+  endTime: string;
   name: string;
 };
 
+/**
+ * Event object to be used when retrieving events.
+ */
 export type EventResponse = {
   id: number;
   hash: string;
   name: string;
   created_at: string;
   date_range: {
-    start: string;
-    end: string;
+    start: Temporal.PlainDate;
+    end: Temporal.PlainDate;
   };
+  start_time: Temporal.PlainTime;
+  end_time: Temporal.PlainTime;
 };
 
-/**
- * Check if a date range is valid.
- * @param range The date range to check.
- * @deprecated Not used in the current implementation.
- */
+// /**
+//  * Check if a date range is valid.
+//  * @param range The date range to check.
+//  * @deprecated Not used in the current implementation.
+//  */
 // function isValidDateRange(range: DateRange): boolean {
 //   return range.start < range.end;
 // }
@@ -39,9 +53,7 @@ export type EventResponse = {
  * @returns
  */
 function formatDateRange(range: DateRange): string {
-  return `[${range.start.toISOString().split("T")[0]},${
-    range.end.toISOString().split("T")[0]
-  }]`;
+  return `[${range.start.toString()},${range.end.toString()}]`;
 }
 
 /**
@@ -49,14 +61,14 @@ function formatDateRange(range: DateRange): string {
  * @param e The event object to create.
  * @returns The unique hash of the event as a nanoid.
  */
-export async function createEvent(e: Event) {
+export async function createEvent(e: EventRequest) {
   const client = await connect();
   try {
     const eventHash = nanoid();
 
     const res = await client.query(
-      `INSERT INTO events (created_at, hash, date_range, name) VALUES (NOW(), $1, $2, $3)`,
-      [eventHash, formatDateRange(e.dates), e.name]
+      `INSERT INTO events (created_at, hash, date_range, name, start_time, end_time) VALUES (NOW(), $1, $2, $3, $4, $5)`,
+      [eventHash, formatDateRange(e.dates), e.name, e.startTime, e.endTime]
     );
 
     if (res.rowCount != 1) {
@@ -96,6 +108,8 @@ export async function getEvent(hash: string): Promise<EventResponse | false> {
         start: row.date_range.start,
         end: row.date_range.end,
       },
+      start_time: row.start_time,
+      end_time: row.end_time,
     };
   } catch (error) {
     console.error(error);

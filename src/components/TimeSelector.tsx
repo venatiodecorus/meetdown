@@ -1,26 +1,30 @@
 import { useState } from "react";
+import { Temporal } from "temporal-polyfill";
 
 interface TimeSelectorProps {
-  onTimeRangeChange: (range: [Date, Date]) => void;
+  onTimeRangeChange: (range: [Temporal.PlainTime, Temporal.PlainTime]) => void;
 }
 
 export default function TimeSelector({ onTimeRangeChange }: TimeSelectorProps) {
-  const [startTime, setStartTime] = useState<Date | null>(null);
-  const [endTime, setEndTime] = useState<Date | null>(null);
+  // TODO Use Temporal.Duration?
+  const [startTime, setStartTime] = useState<Temporal.PlainTime | null>(null);
+  const [endTime, setEndTime] = useState<Temporal.PlainTime | null>(null);
 
   const handleTimeChange = (time: string, isStart: boolean) => {
     const [hours, minutes] = time.split(":").map(Number);
 
     if (isStart) {
-      const newStartTime = startTime ? new Date(startTime) : new Date();
-      newStartTime.setHours(hours, minutes);
+      const newStartTime = startTime
+        ? startTime.with({ hour: hours, minute: minutes })
+        : Temporal.PlainTime.from({ hour: hours, minute: minutes });
       setStartTime(newStartTime);
       if (newStartTime && endTime) {
         onTimeRangeChange([newStartTime, endTime]);
       }
     } else {
-      const newEndTime = endTime ? new Date(endTime) : new Date();
-      newEndTime.setHours(hours, minutes);
+      const newEndTime = endTime
+        ? endTime.with({ hour: hours, minute: minutes })
+        : Temporal.PlainTime.from({ hour: hours, minute: minutes });
       setEndTime(newEndTime);
       if (startTime && newEndTime) {
         onTimeRangeChange([startTime, newEndTime]);
@@ -34,8 +38,8 @@ export default function TimeSelector({ onTimeRangeChange }: TimeSelectorProps) {
         type="time"
         value={
           startTime
-            ? `${String(startTime.getHours()).padStart(2, "0")}:${String(
-                startTime.getMinutes()
+            ? `${String(startTime.hour).padStart(2, "0")}:${String(
+                startTime.minute
               ).padStart(2, "0")}`
             : ""
         }
@@ -46,8 +50,8 @@ export default function TimeSelector({ onTimeRangeChange }: TimeSelectorProps) {
         type="time"
         value={
           endTime
-            ? `${String(endTime.getHours()).padStart(2, "0")}:${String(
-                endTime.getMinutes()
+            ? `${String(endTime.hour).padStart(2, "0")}:${String(
+                endTime.minute
               ).padStart(2, "0")}`
             : ""
         }

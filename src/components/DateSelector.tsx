@@ -1,7 +1,8 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { Temporal } from "temporal-polyfill";
 
 interface DateSelectorProps {
-  onDateRangeChange: (range: [Date, Date]) => void;
+  onDateRangeChange: (range: [Temporal.PlainDate, Temporal.PlainDate]) => void;
 }
 
 /**
@@ -10,11 +11,11 @@ interface DateSelectorProps {
  * @returns
  */
 export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
-  const [month] = useState<number>(new Date().getMonth());
-  const [year] = useState<number>(new Date().getFullYear());
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [hoverDate, setHoverDate] = useState<Date | null>(null);
+  const [month] = useState<number>(Temporal.Now.plainDateISO().month);
+  const [year] = useState<number>(Temporal.Now.plainDateISO().year);
+  const [startDate, setStartDate] = useState<Temporal.PlainDate | null>(null);
+  const [endDate, setEndDate] = useState<Temporal.PlainDate | null>(null);
+  const [hoverDate, setHoverDate] = useState<Temporal.PlainDate | null>(null);
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -25,8 +26,13 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
   // const firstDayOfMonth = new Date(year, month, 1).getDay();
   // const daysInMonth = getDaysInMonth(month, year);
   const { firstDayOfMonth, daysInMonth } = useMemo(() => {
-    const firstDay = new Date(year, month, 1).getDay();
-    const days = new Date(year, month + 1, 0).getDate();
+    const firstDay =
+      Temporal.PlainDate.from({ year, month: month, day: 1 }).dayOfWeek % 7;
+    const days = Temporal.PlainDate.from({
+      year,
+      month: month,
+      day: 1,
+    }).daysInMonth;
     return { firstDayOfMonth: firstDay, daysInMonth: days };
   }, [year, month]);
 
@@ -51,36 +57,35 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
   // );
   const onClick = useCallback(
     (day: number) => {
-      const selectedDate = new Date(year, month, day);
-      setStartDate((prevStart) => {
-        if (!prevStart) {
-          return selectedDate;
-        }
-        setEndDate((prevEnd) => {
-          // If end date is not set, call onDateRangeChange
-          if (!prevEnd) {
-            onDateRangeChange([prevStart, selectedDate]);
-            return selectedDate;
-          }
-          // If both set, restart by replacing start
-          setHoverDate(null);
-          return null;
-        });
-        return selectedDate;
-      });
+      const selectedDate = Temporal.PlainDate.from({ year, month, day });
+      if (!startDate || (startDate && endDate)) {
+        // No start date or full range already selected, start new range.
+        setStartDate(selectedDate);
+        setEndDate(null);
+        setHoverDate(null);
+      } else if (!endDate) {
+        // Range in progress, so set the end date.
+        setEndDate(selectedDate);
+      }
     },
-    [year, month, onDateRangeChange]
+    [startDate, endDate, year, month]
   );
 
   const onHover = useCallback(
-    (date: Date) => {
+    (date: Temporal.PlainDate) => {
       if (startDate && !endDate) {
         setHoverDate(date);
-        console.log(date);
       }
     },
     [startDate, endDate]
   );
+
+  // Trigger parent's onDateRangeChange after both startDate and endDate are set.
+  useEffect(() => {
+    if (startDate && endDate) {
+      onDateRangeChange([startDate, endDate]);
+    }
+  }, [startDate, endDate, onDateRangeChange]);
 
   const days = useMemo(() => {
     const dayElements = [];
@@ -90,17 +95,17 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
       );
     }
     for (let i = 1; i <= daysInMonth; i++) {
-      const currentDate = new Date(year, month, i);
+      const currentDate = Temporal.PlainDate.from({ year, month, day: i });
       const isHighlighted =
         (startDate &&
           endDate &&
-          currentDate >= startDate &&
-          currentDate <= endDate) ||
+          Temporal.PlainDate.compare(currentDate, startDate) >= 0 &&
+          Temporal.PlainDate.compare(currentDate, endDate) <= 0) ||
         (startDate &&
           !endDate &&
           hoverDate &&
-          currentDate >= startDate &&
-          currentDate <= hoverDate);
+          Temporal.PlainDate.compare(currentDate, startDate) >= 0 &&
+          Temporal.PlainDate.compare(currentDate, hoverDate) <= 0);
       dayElements.push(
         <div
           key={i}

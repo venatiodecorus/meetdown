@@ -1,29 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import DateSelector from "@/components/DateSelector";
-import { Event, createEvent } from "../../lib/events";
+import { EventRequest, createEvent } from "../../lib/events";
 import TimeSelector from "@/components/TimeSelector";
+import { Temporal } from "temporal-polyfill";
 
 export default function Page() {
-  type ValuePiece = Date;
+  type ValuePiece = Temporal.PlainDate;
   type Value = [ValuePiece, ValuePiece];
 
-  const [value, onChange] = useState<Value>([new Date(), new Date()]);
-  const [hash, setHash] = useState<string>();
+  const now = Temporal.Now.plainDateISO();
+  const [dateRange, setRange] = useState<Value>([now, now]);
+  const [startTime, setStartTime] = useState<Temporal.PlainTime | null>(null);
+  const [endTime, setEndTime] = useState<Temporal.PlainTime | null>(null);
+  const [hash, setHash] = useState<string>("");
 
-  const handleDateRangeChange = (range: [Date, Date]) => {
-    onChange(range);
-  };
+  const handleDateRangeChange = useCallback(
+    (newRange: [Temporal.PlainDate, Temporal.PlainDate]) => {
+      setRange(newRange);
+    },
+    []
+  );
 
-  const handleTimeRangeChange = (range: [Date, Date]) => {
+  const handleTimeRangeChange = (
+    newRange: [Temporal.PlainTime, Temporal.PlainTime]
+  ) => {
+    setStartTime(newRange[0]);
+    setEndTime(newRange[1]);
     // Keep the existing date and only update the time
-    const newRange: Value = [new Date(value[0]), new Date(value[1])];
-    newRange[0].setHours(range[0].getHours());
-    newRange[0].setMinutes(range[0].getMinutes());
-    newRange[1].setHours(range[1].getHours());
-    newRange[1].setMinutes(range[1].getMinutes());
-    onChange(newRange);
+    // setRange([
+    //   Temporal.PlainDateTime.from({
+    //     ...dateRange[0],
+    //     hour: newRange[0].hour,
+    //     minute: newRange[0].minute,
+    //   }),
+    //   Temporal.PlainDateTime.from({
+    //     ...dateRange[1],
+    //     hour: newRange[1].hour,
+    //     minute: newRange[1].minute,
+    //   }),
+    // ]);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -36,20 +53,26 @@ export default function Page() {
       return false;
     }
 
-    if (!Array.isArray(value)) {
+    if (!Array.isArray(dateRange)) {
       return false;
     }
 
-    if (value[0] == null || value[1] == null) {
+    if (dateRange[0] == null || dateRange[1] == null) {
       return false;
     }
 
-    const newEvent: Event = {
+    // TODO Is there a better way to handle this?
+    // Passing strings here because of error from Next.js:
+    // Only plain objects can be passed to Server Functions from the Client.
+    // Temporal.PlainDate objects are not supported.
+    const newEvent: EventRequest = {
       name: eventName,
       dates: {
-        start: value[0],
-        end: value[1],
+        start: dateRange[0].toString(),
+        end: dateRange[1].toString(),
       },
+      startTime: (startTime ?? Temporal.PlainTime.from("00:00")).toString(),
+      endTime: (endTime ?? Temporal.PlainTime.from("23:59")).toString(),
     };
 
     const hash = await createEvent(newEvent);
