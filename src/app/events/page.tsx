@@ -7,18 +7,15 @@ import TimeSelector from "@/components/TimeSelector";
 import { Temporal } from "temporal-polyfill";
 
 export default function Page() {
-  type ValuePiece = Temporal.PlainDate;
-  type Value = [ValuePiece, ValuePiece];
-
   const now = Temporal.Now.plainDateISO();
-  const [dateRange, setRange] = useState<Value>([now, now]);
+  const [selectedDates, setSelectedDates] = useState<Temporal.PlainDate[]>([now]);
   const [startTime, setStartTime] = useState<Temporal.PlainTime | null>(null);
   const [endTime, setEndTime] = useState<Temporal.PlainTime | null>(null);
   const [hash, setHash] = useState<string>("");
 
   const handleDateRangeChange = useCallback(
-    (newRange: [Temporal.PlainDate, Temporal.PlainDate]) => {
-      setRange(newRange);
+    (dates: Temporal.PlainDate[]) => {
+      setSelectedDates(dates);
     },
     []
   );
@@ -49,30 +46,24 @@ export default function Page() {
     const formData = new FormData(e.currentTarget as HTMLFormElement);
     const eventName = formData.get("eventName") as string;
 
-    if (!eventName) {
+    if (!eventName || selectedDates.length === 0) {
       return false;
     }
 
-    if (!Array.isArray(dateRange)) {
-      return false;
-    }
+    // Sort dates to get the earliest and latest
+    const sortedDates = [...selectedDates].sort(Temporal.PlainDate.compare);
+    const startDate = sortedDates[0];
+    const endDate = sortedDates[sortedDates.length - 1];
 
-    if (dateRange[0] == null || dateRange[1] == null) {
-      return false;
-    }
-
-    // TODO Is there a better way to handle this?
-    // Passing strings here because of error from Next.js:
-    // Only plain objects can be passed to Server Functions from the Client.
-    // Temporal.PlainDate objects are not supported.
     const newEvent: EventRequest = {
       name: eventName,
       dates: {
-        start: dateRange[0].toString(),
-        end: dateRange[1].toString(),
+        start: startDate.toString(),
+        end: endDate.toString(),
       },
       startTime: (startTime ?? Temporal.PlainTime.from("00:00")).toString(),
       endTime: (endTime ?? Temporal.PlainTime.from("23:59")).toString(),
+      dateRanges: selectedDates.map(date => date.toString()),
     };
 
     const hash = await createEvent(newEvent);

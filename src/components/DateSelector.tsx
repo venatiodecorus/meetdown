@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { Temporal } from "temporal-polyfill";
 
 interface DateSelectorProps {
-  onDateRangeChange: (range: [Temporal.PlainDate, Temporal.PlainDate]) => void;
+  onDateRangeChange: (dates: Temporal.PlainDate[]) => void;
 }
 
 /**
@@ -11,81 +11,104 @@ interface DateSelectorProps {
  * @returns
  */
 export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
-  const [month] = useState<number>(Temporal.Now.plainDateISO().month);
-  const [year] = useState<number>(Temporal.Now.plainDateISO().year);
-  const [startDate, setStartDate] = useState<Temporal.PlainDate | null>(null);
-  const [endDate, setEndDate] = useState<Temporal.PlainDate | null>(null);
+  const [currentDate, setCurrentDate] = useState(() => {
+    const today = Temporal.Now.plainDateISO();
+    return Temporal.PlainDate.from({
+      year: today.year,
+      month: today.month,
+      day: 1
+    });
+  });
+  
+  const [selectedDates, setSelectedDates] = useState<Temporal.PlainDate[]>([]);
+  const [isRangeSelecting, setIsRangeSelecting] = useState(false);
+  const [rangeStart, setRangeStart] = useState<Temporal.PlainDate | null>(null);
   const [hoverDate, setHoverDate] = useState<Temporal.PlainDate | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  // const getDaysInMonth = (month: number, year: number) => {
-  //   return new Date(year, month + 1, 0).getDate();
-  // };
-
-  // const firstDayOfMonth = new Date(year, month, 1).getDay();
-  // const daysInMonth = getDaysInMonth(month, year);
   const { firstDayOfMonth, daysInMonth } = useMemo(() => {
-    const firstDay =
-      Temporal.PlainDate.from({ year, month: month, day: 1 }).dayOfWeek % 7;
-    const days = Temporal.PlainDate.from({
-      year,
-      month: month,
-      day: 1,
-    }).daysInMonth;
+    const firstDay = currentDate.dayOfWeek % 7;
+    const days = currentDate.daysInMonth;
     return { firstDayOfMonth: firstDay, daysInMonth: days };
-  }, [year, month]);
+  }, [currentDate]);
 
-  // const onClick = useCallback(
-  //   (day: number) => {
-  //     const selectedDate = new Date(year, month, day);
-  //     console.log(
-  //       `Start Date: ${startDate}\nEnd Date: ${endDate}\nHover Date: ${hoverDate}`
-  //     );
-  //     if (!startDate) {
-  //       setStartDate(selectedDate);
-  //     } else if (!endDate) {
-  //       setEndDate(selectedDate);
-  //       onDateRangeChange([startDate, selectedDate]);
-  //     } else {
-  //       setStartDate(selectedDate);
-  //       setEndDate(null);
-  //       setHoverDate(null);
-  //     }
-  //   },
-  //   [year, month, startDate, endDate, hoverDate, onDateRangeChange]
-  // );
-  const onClick = useCallback(
-    (day: number) => {
-      const selectedDate = Temporal.PlainDate.from({ year, month, day });
-      if (!startDate || (startDate && endDate)) {
-        // No start date or full range already selected, start new range.
-        setStartDate(selectedDate);
-        setEndDate(null);
-        setHoverDate(null);
-      } else if (!endDate) {
-        // Range in progress, so set the end date.
-        setEndDate(selectedDate);
+  const toggleDate = useCallback((date: Temporal.PlainDate) => {
+    setSelectedDates(prev => {
+      const isSelected = prev.some(d => 
+        Temporal.PlainDate.compare(d, date) === 0
+      );
+      
+      if (isSelected) {
+        return prev.filter(d => 
+          Temporal.PlainDate.compare(d, date) !== 0
+        );
+      } else {
+        return [...prev, date];
       }
-    },
-    [startDate, endDate, year, month]
-  );
+    });
+  }, []);
 
-  const onHover = useCallback(
-    (date: Temporal.PlainDate) => {
-      if (startDate && !endDate) {
-        setHoverDate(date);
-      }
-    },
-    [startDate, endDate]
-  );
+  const onMouseDown = useCallback((date: Temporal.PlainDate) => {
+    setIsRangeSelecting(true);
+    setRangeStart(date);
+    setHoverDate(date);
+    setIsDragging(false);
+  }, []);
 
-  // Trigger parent's onDateRangeChange after both startDate and endDate are set.
-  useEffect(() => {
-    if (startDate && endDate) {
-      onDateRangeChange([startDate, endDate]);
+  const onMouseMove = useCallback((date: Temporal.PlainDate) => {
+    if (isRangeSelecting) {
+      setIsDragging(true);
+      setHoverDate(date);
     }
-  }, [startDate, endDate, onDateRangeChange]);
+  }, [isRangeSelecting]);
+
+  const onMouseUp = useCallback((date: Temporal.PlainDate) => {
+    if (isRangeSelecting) {
+      if (isDragging) {
+        // Handle range selection
+        const start = Temporal.PlainDate.compare(rangeStart!, hoverDate!) <= 0 
+          ? rangeStart! 
+          : hoverDate!;
+        const end = Temporal.PlainDate.compare(rangeStart!, hoverDate!) <= 0 
+          ? hoverDate! 
+          : rangeStart!;
+
+        const datesInRange: Temporal.PlainDate[] = [];
+        let current = start;
+        while (Temporal.PlainDate.compare(current, end) <= 0) {
+          datesInRange.push(current);
+          current = current.add({ days: 1 });
+        }
+
+        setSelectedDates(prev => {
+          const newDates = new Set([...prev.map(d => d.toString()), ...datesInRange.map(d => d.toString())]);
+          return Array.from(newDates).map(d => Temporal.PlainDate.from(d));
+        });
+      } else {
+        // Handle single click
+        toggleDate(date);
+      }
+    }
+    
+    setIsRangeSelecting(false);
+    setRangeStart(null);
+    setHoverDate(null);
+    setIsDragging(false);
+  }, [isRangeSelecting, isDragging, rangeStart, hoverDate, toggleDate]);
+
+  const handlePreviousMonth = useCallback(() => {
+    setCurrentDate(date => date.subtract({ months: 1 }));
+  }, []);
+
+  const handleNextMonth = useCallback(() => {
+    setCurrentDate(date => date.add({ months: 1 }));
+  }, []);
+
+  useEffect(() => {
+    onDateRangeChange(selectedDates);
+  }, [selectedDates, onDateRangeChange]);
 
   const days = useMemo(() => {
     const dayElements = [];
@@ -95,49 +118,95 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
       );
     }
     for (let i = 1; i <= daysInMonth; i++) {
-      const currentDate = Temporal.PlainDate.from({ year, month, day: i });
-      const isHighlighted =
-        (startDate &&
-          endDate &&
-          Temporal.PlainDate.compare(currentDate, startDate) >= 0 &&
-          Temporal.PlainDate.compare(currentDate, endDate) <= 0) ||
-        (startDate &&
-          !endDate &&
-          hoverDate &&
-          Temporal.PlainDate.compare(currentDate, startDate) >= 0 &&
-          Temporal.PlainDate.compare(currentDate, hoverDate) <= 0);
+      const currentDateInMonth = Temporal.PlainDate.from({ 
+        year: currentDate.year, 
+        month: currentDate.month, 
+        day: i 
+      });
+      
+      const isSelected = selectedDates.some(d => 
+        Temporal.PlainDate.compare(d, currentDateInMonth) === 0
+      );
+
+      const isInTempRange = isRangeSelecting && rangeStart && hoverDate && (
+        Temporal.PlainDate.compare(currentDateInMonth, rangeStart) >= 0 &&
+        Temporal.PlainDate.compare(currentDateInMonth, hoverDate) <= 0 ||
+        Temporal.PlainDate.compare(currentDateInMonth, rangeStart) <= 0 &&
+        Temporal.PlainDate.compare(currentDateInMonth, hoverDate) >= 0
+      );
+
       dayElements.push(
         <div
           key={i}
-          className={`border border-gray-200 h-12 flex items-center justify-center ${
-            isHighlighted ? "bg-gray-600" : ""
-          }`}
-          onClick={() => onClick(i)}
-          onMouseOver={() => onHover(currentDate)}
+          className={`border border-gray-200 h-12 flex items-center justify-center cursor-pointer select-none
+            ${isSelected ? 'bg-blue-600 text-white' : ''}
+            ${isInTempRange ? 'bg-blue-200' : ''}
+            hover:bg-gray-100`}
+          onMouseDown={() => onMouseDown(currentDateInMonth)}
+          onMouseMove={() => onMouseMove(currentDateInMonth)}
+          onMouseUp={() => onMouseUp(currentDateInMonth)}
         >
           {i}
         </div>
       );
     }
     return dayElements;
-    // include dependencies so it's re-computed when they change
   }, [
     firstDayOfMonth,
     daysInMonth,
-    month,
-    year,
-    startDate,
-    endDate,
+    currentDate,
+    selectedDates,
+    isRangeSelecting,
+    rangeStart,
     hoverDate,
-    onClick,
-    onHover,
+    onMouseDown,
+    onMouseMove,
+    onMouseUp,
   ]);
 
   return (
     <div className="p-4">
-      <div className="text-center font-bold text-lg mb-4">
-        {new Date(year, month).toLocaleString("default", { month: "long" })}{" "}
-        {year}
+      <div className="flex items-center justify-between mb-4">
+        <div
+          onClick={handlePreviousMonth}
+          className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100 cursor-pointer"
+        >
+          <svg 
+            className="h-4 w-4" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M15 19l-7-7 7-7" 
+            />
+          </svg>
+        </div>
+        <div className="text-center font-bold text-lg">
+          {currentDate.toLocaleString("default", { month: "long" })}{" "}
+          {currentDate.year}
+        </div>
+        <div
+          onClick={handleNextMonth}
+          className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100 cursor-pointer"
+        >
+          <svg 
+            className="h-4 w-4" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M9 5l7 7-7 7" 
+            />
+          </svg>
+        </div>
       </div>
       <div className="grid grid-cols-7 gap-2 mb-2">
         {daysOfWeek.map((day) => (

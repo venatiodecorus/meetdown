@@ -15,12 +15,17 @@ type DateRange = {
 /**
  * Event object to be used when creating new events.
  */
-export type EventRequest = {
-  dates: DateRange;
+export interface EventRequest {
+  /** @deprecated Use dateRanges instead - this will be removed in a future version */
+  dates: {
+    start: string;
+    end: string;
+  };
   startTime: string;
   endTime: string;
   name: string;
-};
+  dateRanges: string[];
+}
 
 /**
  * Event object to be used when retrieving events.
@@ -30,12 +35,14 @@ export type EventResponse = {
   hash: string;
   name: string;
   created_at: string;
+  /** @deprecated Use dateRanges instead - this will be removed in a future version */
   date_range: {
     start: Temporal.PlainDate;
     end: Temporal.PlainDate;
   };
   start_time: Temporal.PlainTime;
   end_time: Temporal.PlainTime;
+  date_ranges: Temporal.PlainDate[];
 };
 
 // /**
@@ -67,8 +74,8 @@ export async function createEvent(e: EventRequest) {
     const eventHash = nanoid();
 
     const res = await client.query(
-      `INSERT INTO events (created_at, hash, date_range, name, start_time, end_time) VALUES (NOW(), $1, $2, $3, $4, $5)`,
-      [eventHash, formatDateRange(e.dates), e.name, e.startTime, e.endTime]
+      `INSERT INTO events (created_at, hash, date_range, name, start_time, end_time, date_ranges) VALUES (NOW(), $1, $2, $3, $4, $5, $6)`,
+      [eventHash, formatDateRange(e.dates), e.name, e.startTime, e.endTime, e.dateRanges]
     );
 
     if (res.rowCount != 1) {
@@ -110,6 +117,7 @@ export async function getEvent(hash: string): Promise<EventResponse | false> {
       },
       start_time: row.start_time,
       end_time: row.end_time,
+      date_ranges: row.date_ranges,
     };
   } catch (error) {
     console.error(error);
