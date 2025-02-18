@@ -11,7 +11,7 @@ interface DateSelectorProps {
  * @returns
  */
 export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
-  const [currentDate, setCurrentDate] = useState(() => {
+  const [leftDate, setLeftDate] = useState(() => {
     const today = Temporal.Now.plainDateISO();
     return Temporal.PlainDate.from({
       year: today.year,
@@ -19,7 +19,11 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
       day: 1
     });
   });
-  
+
+  const [rightDate, setRightDate] = useState(() => {
+    return leftDate.add({ months: 1 });
+  });
+
   const [selectedDates, setSelectedDates] = useState<Temporal.PlainDate[]>([]);
   const [isRangeSelecting, setIsRangeSelecting] = useState(false);
   const [rangeStart, setRangeStart] = useState<Temporal.PlainDate | null>(null);
@@ -27,12 +31,6 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
   const [isDragging, setIsDragging] = useState(false);
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  const { firstDayOfMonth, daysInMonth } = useMemo(() => {
-    const firstDay = currentDate.dayOfWeek % 7;
-    const days = currentDate.daysInMonth;
-    return { firstDayOfMonth: firstDay, daysInMonth: days };
-  }, [currentDate]);
 
   const toggleDate = useCallback((date: Temporal.PlainDate) => {
     setSelectedDates(prev => {
@@ -99,28 +97,37 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
   }, [isRangeSelecting, isDragging, rangeStart, hoverDate, toggleDate]);
 
   const handlePreviousMonth = useCallback(() => {
-    setCurrentDate(date => date.subtract({ months: 1 }));
+    setLeftDate(date => date.subtract({ months: 1 }));
+    setRightDate(date => date.subtract({ months: 1 }));
   }, []);
 
   const handleNextMonth = useCallback(() => {
-    setCurrentDate(date => date.add({ months: 1 }));
+    setLeftDate(date => date.add({ months: 1 }));
+    setRightDate(date => date.add({ months: 1 }));
   }, []);
 
   useEffect(() => {
     onDateRangeChange(selectedDates);
   }, [selectedDates, onDateRangeChange]);
 
-  const days = useMemo(() => {
+  const renderMonth = useCallback((date: Temporal.PlainDate) => {
+    const firstDay = date.dayOfWeek % 7;
+    const daysInMonth = date.daysInMonth;
     const dayElements = [];
-    for (let i = 0; i < firstDayOfMonth; i++) {
+    const totalCells = 42; // 6 rows × 7 days
+
+    // First week empty days
+    for (let i = 0; i < firstDay; i++) {
       dayElements.push(
-        <div key={`empty-${i}`} className="border border-gray-200 h-12"></div>
+        <div key={`empty-start-${i}`} className="border border-gray-200 h-12"></div>
       );
     }
+
+    // Days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       const currentDateInMonth = Temporal.PlainDate.from({ 
-        year: currentDate.year, 
-        month: currentDate.month, 
+        year: date.year, 
+        month: date.month, 
         day: i 
       });
       
@@ -129,10 +136,10 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
       );
 
       const isInTempRange = isRangeSelecting && rangeStart && hoverDate && (
-        Temporal.PlainDate.compare(currentDateInMonth, rangeStart) >= 0 &&
-        Temporal.PlainDate.compare(currentDateInMonth, hoverDate) <= 0 ||
-        Temporal.PlainDate.compare(currentDateInMonth, rangeStart) <= 0 &&
-        Temporal.PlainDate.compare(currentDateInMonth, hoverDate) >= 0
+        (Temporal.PlainDate.compare(currentDateInMonth, rangeStart) >= 0 &&
+         Temporal.PlainDate.compare(currentDateInMonth, hoverDate) <= 0) ||
+        (Temporal.PlainDate.compare(currentDateInMonth, rangeStart) <= 0 &&
+         Temporal.PlainDate.compare(currentDateInMonth, hoverDate) >= 0)
       );
 
       dayElements.push(
@@ -150,22 +157,20 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
         </div>
       );
     }
+
+    // Remaining empty cells to maintain 6 rows
+    const remainingCells = totalCells - (firstDay + daysInMonth);
+    for (let i = 0; i < remainingCells; i++) {
+      dayElements.push(
+        <div key={`empty-end-${i}`} className="border border-gray-200 h-12"></div>
+      );
+    }
+
     return dayElements;
-  }, [
-    firstDayOfMonth,
-    daysInMonth,
-    currentDate,
-    selectedDates,
-    isRangeSelecting,
-    rangeStart,
-    hoverDate,
-    onMouseDown,
-    onMouseMove,
-    onMouseUp,
-  ]);
+  }, [selectedDates, isRangeSelecting, rangeStart, hoverDate, onMouseDown, onMouseMove, onMouseUp]);
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <div
           onClick={handlePreviousMonth}
@@ -185,9 +190,15 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
             />
           </svg>
         </div>
-        <div className="text-center font-bold text-lg">
-          {currentDate.toLocaleString("default", { month: "long" })}{" "}
-          {currentDate.year}
+        <div className="flex-1 grid grid-cols-2 gap-4">
+          <div className="text-center font-bold text-lg">
+            {leftDate.toLocaleString("default", { month: "long" })}{" "}
+            {leftDate.year}
+          </div>
+          <div className="text-center font-bold text-lg">
+            {rightDate.toLocaleString("default", { month: "long" })}{" "}
+            {rightDate.year}
+          </div>
         </div>
         <div
           onClick={handleNextMonth}
@@ -208,14 +219,36 @@ export default function DateSelector({ onDateRangeChange }: DateSelectorProps) {
           </svg>
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-2 mb-2">
-        {daysOfWeek.map((day) => (
-          <div key={day} className="text-center font-bold">
-            {day}
+      
+      <div className="grid grid-cols-2 gap-8">
+        {/* Left Calendar */}
+        <div>
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {daysOfWeek.map((day) => (
+              <div key={`left-${day}`} className="text-center font-bold">
+                {day}
+              </div>
+            ))}
           </div>
-        ))}
+          <div className="grid grid-cols-7 gap-2">
+            {renderMonth(leftDate)}
+          </div>
+        </div>
+
+        {/* Right Calendar */}
+        <div>
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {daysOfWeek.map((day) => (
+              <div key={`right-${day}`} className="text-center font-bold">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {renderMonth(rightDate)}
+          </div>
+        </div>
       </div>
-      <div className="grid grid-cols-7 gap-2">{days}</div>
     </div>
   );
 }

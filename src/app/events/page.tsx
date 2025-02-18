@@ -80,7 +80,7 @@ export default function Page() {
   return (
     <>
       <p className="text-2xl">Create a new event</p>
-      <form className="flex max-w-md flex-col gap-4" onSubmit={handleSubmit}>
+      <form className="flex max-w-5xl flex-col gap-4" onSubmit={handleSubmit}>
         <label htmlFor="eventName">Event Name</label>
         <input
           id="eventName"
