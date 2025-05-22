@@ -6,6 +6,11 @@ import { EventRequest, createEvent } from "../../lib/events";
 import TimeSelector from "@/components/TimeSelector";
 import { Temporal } from "temporal-polyfill";
 
+interface TimeSlot {
+  startTime: Temporal.PlainTime;
+  endTime: Temporal.PlainTime;
+}
+
 export default function Page() {
   const now = Temporal.Now.plainDateISO();
   const [selectedDates, setSelectedDates] = useState<Temporal.PlainDate[]>([now]);
@@ -20,12 +25,19 @@ export default function Page() {
     []
   );
 
-  const handleTimeRangeChange = (
-    newRange: [Temporal.PlainTime, Temporal.PlainTime]
-  ) => {
-    setStartTime(newRange[0]);
-    setEndTime(newRange[1]);
-  };
+  const handleTimeRangeChange = useCallback((selectedTimes: TimeSlot[]) => {
+    if (selectedTimes.length > 0) {
+      // Sort by start time just in case, though TimeSelector should provide them sorted
+      const sortedTimes = [...selectedTimes].sort((a, b) =>
+        Temporal.PlainTime.compare(a.startTime, b.startTime)
+      );
+      setStartTime(sortedTimes[0].startTime);
+      setEndTime(sortedTimes[sortedTimes.length - 1].endTime);
+    } else {
+      setStartTime(null);
+      setEndTime(null);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -96,7 +108,7 @@ export default function Page() {
             </div>
             
             <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-xl transition-colors">
-              <TimeSelector onTimeRangeChange={handleTimeRangeChange} />
+              <TimeSelector onTimeSelectionChange={handleTimeRangeChange} />
             </div>
           </div>
 
